@@ -6,7 +6,8 @@ using System;
 using System.Linq;
 using System.IO;
 using System.Collections.Generic;
-
+using TMPro;
+using UnityEngine.SceneManagement;
 
 public class ImageProcessorClient : MonoBehaviour
 {
@@ -18,17 +19,31 @@ public class ImageProcessorClient : MonoBehaviour
     public RawImage displayImage;
     public RawImage displayImageRecebida;
     public Texture2D imageToSend;
+    [Header("Imagens to change")]
+    private int imageIndex = 0;
+    private Texture2D[] images;
+    public Texture2D image1;
+    public Texture2D image2;
+    public Texture2D image3;
+    public Texture2D image4;
+    public Texture2D image5;
+    public Texture2D image6;
+
     [Header("Camera")]
     public bool useCameraCapture = false;
     private UnityEngine.Windows.WebCam.PhotoCapture photoCaptureObject = null;
     private Texture2D cameraTexture = null;
+    public TextMeshPro butaoCamera;
 
     private List<float> processingTimes = new List<float>();
+    int frameCount = 0;
 
     void Start()
     {
         Debug.Log("===== Starting ImageProcessorClient =====");
         Debug.Log($"Server URL: {serverUrl}");
+
+        images = new Texture2D[] { image1, image2, image3, image4, image5, image6 };
 
         if (!useCameraCapture && imageToSend == null)
         {
@@ -46,8 +61,6 @@ public class ImageProcessorClient : MonoBehaviour
 
     IEnumerator SendCameraImageRoutine()
     {
-        int frameCount = 0;
-
         // Inicializa a captura da câmera se useCameraCapture estiver habilitado
         if (useCameraCapture)
         {
@@ -89,20 +102,31 @@ public class ImageProcessorClient : MonoBehaviour
             Texture2D textureToSend;
             if (useCameraCapture)
             {
+                displayImageRecebida.texture = null;
                 // Captura um frame da câmera
-                photoCaptureObject.TakePhotoAsync(delegate (UnityEngine.Windows.WebCam.PhotoCapture.PhotoCaptureResult result, UnityEngine.Windows.WebCam.PhotoCaptureFrame photoCaptureFrame)
+                if (photoCaptureObject != null)
                 {
-                    if (result.success)
+                    photoCaptureObject.TakePhotoAsync(delegate (UnityEngine.Windows.WebCam.PhotoCapture.PhotoCaptureResult result, UnityEngine.Windows.WebCam.PhotoCaptureFrame photoCaptureFrame)
                     {
-                        // Copia os dados da câmera para a textura
-                        photoCaptureFrame.UploadImageDataToTexture(cameraTexture);
-                        cameraTexture.Apply();
-                    }
-                    else
-                    {
-                        Debug.LogError("Failed to take photo!");
-                    }
-                });
+                        if (result.success)
+                        {
+                            // Copia os dados da câmera para a textura
+                            photoCaptureFrame.UploadImageDataToTexture(cameraTexture);
+                            cameraTexture.Apply();
+                        }
+                        else
+                        {
+                            Debug.LogError("Failed to take photo!");
+                        }
+                    });
+                }
+                else
+                {
+                    Debug.LogWarning("Photo capture object is null, waiting for initialization...");
+                    yield return null; // Wait a frame and try again
+                    continue; // Skip the rest of the loop and retry
+                }
+
                 // Aguarda a captura da foto
                 while (cameraTexture.GetPixels().Length == 0)
                 {
@@ -113,6 +137,8 @@ public class ImageProcessorClient : MonoBehaviour
             else
             {
                 textureToSend = imageToSend;
+                textureToSend = images[imageIndex];
+                imageToSend = textureToSend;
             }
 
             
@@ -195,6 +221,13 @@ public class ImageProcessorClient : MonoBehaviour
             }
 
             Destroy(processedTexture);
+
+            // Update the image index every 5 frames
+            if (frameCount % 5 == 0 && !useCameraCapture)
+            {
+                imageIndex = (imageIndex + 1) % images.Length;
+                Debug.Log($"Changing image to: {images[imageIndex].name}");
+            }
             //yield return new WaitForSeconds(requestInterval);
         }
     }
@@ -306,5 +339,24 @@ public class ImageProcessorClient : MonoBehaviour
 
         RenderTexture.ReleaseTemporary(rt);
         return result;
+    }
+
+    public void ToggleCameraMode()
+    {
+        useCameraCapture = !useCameraCapture;
+        Debug.Log("Camera mode toggled. useCameraCapture is now: " + useCameraCapture);
+        if(useCameraCapture)
+        {
+            butaoCamera.text = "Turn off";
+        }
+        else
+        {
+            butaoCamera.text = "Turn On";
+        }
+    }
+
+    public void LoadScene(string sceneName)
+    {
+        SceneManager.LoadScene(sceneName);
     }
 }
