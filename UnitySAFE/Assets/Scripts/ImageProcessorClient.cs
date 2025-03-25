@@ -22,12 +22,8 @@ public class ImageProcessorClient : MonoBehaviour
     [Header("Imagens to change")]
     private int imageIndex = 0;
     private Texture2D[] images;
-    public Texture2D image1;
-    public Texture2D image2;
-    public Texture2D image3;
-    public Texture2D image4;
-    public Texture2D image5;
-    public Texture2D image6;
+
+    public Texture2D i01, i02, i03, i04, i05, i06, i07, i08, i09, i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31, i32, i33, i34, i35, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47, i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63, i64, i65, i66, i67, i68;
 
     [Header("Camera")]
     public bool useCameraCapture = false;
@@ -43,7 +39,7 @@ public class ImageProcessorClient : MonoBehaviour
         Debug.Log("===== Starting ImageProcessorClient =====");
         Debug.Log($"Server URL: {serverUrl}");
 
-        images = new Texture2D[] { image1, image2, image3, image4, image5, image6 };
+        images = new Texture2D[] { i01, i02, i03, i04, i05, i06, i07, i08, i09, i10, i11, i12, i13, i14, i15, i16, i17, i18, i19, i20, i21, i22, i23, i24, i25, i26, i27, i28, i29, i30, i31, i32, i33, i34, i35, i37, i38, i39, i40, i41, i42, i43, i44, i45, i46, i47, i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63, i64, i65, i66, i67, i68};
 
         if (!useCameraCapture && imageToSend == null)
         {
@@ -94,7 +90,7 @@ public class ImageProcessorClient : MonoBehaviour
         {
             frameCount++;
             Debug.Log($"\n===== Starting Frame #{frameCount} =====");
-            float startTime = Time.time;
+            string startTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
             
             yield return new WaitForEndOfFrame();
 
@@ -172,15 +168,14 @@ public class ImageProcessorClient : MonoBehaviour
                 www.downloadHandler = new DownloadHandlerBuffer();
                 yield return www.SendWebRequest();
 
-                float endTime = Time.time;
-                float elapsedTime = endTime - startTime;
-                processingTimes.Add(elapsedTime);
-                Debug.Log($"Frame #{frameCount} took {elapsedTime} seconds to process");
+                string endTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
 
-                if (processingTimes.Count % 10 == 0) // Every 10 frames, log stats
-                {
-                    LogProcessingStats();
-                }
+                Debug.Log($"Frame #{frameCount}; Image {images[imageIndex]}; Start: {startTime}; End: {endTime}");
+                string logEntry = $"{frameCount}; {images[imageIndex]?.name}; {startTime}; {endTime}";
+                Debug.Log(logEntry);
+                #if UNITY_EDITOR
+                SaveLogToFile(logEntry);
+                #endif
 
                 if (www.result != UnityWebRequest.Result.Success)
                 {
@@ -201,29 +196,29 @@ public class ImageProcessorClient : MonoBehaviour
 
                     string imageData = responseParts[0].Trim();
 
-                    #if UNITY_EDITOR
+                    /*#if UNITY_EDITOR
                     string filePathB = Path.Combine(Application.persistentDataPath, $"{frameCount}_response.txt");
                     File.WriteAllBytes(filePathB, imageData.Select(c => (byte)c).ToArray());
-                    #endif
+                    #endif*/
 
                     Texture2D texture = DecodeBase64ToTexture(imageData,frameCount);
 
                     displayImageRecebida.texture = texture;
                     Debug.Log("Received image displayed successfully!");
 
-                    #if UNITY_EDITOR
+                    /*#if UNITY_EDITOR
                     //string filePathC = Path.Combine(Application.persistentDataPath, $"{frameCount}_DEPOISimage.txt");
                     //File.WriteAllBytes(filePathC, imageBytes);
                     string filePathD = Path.Combine(Application.persistentDataPath, $"{frameCount}_DEPOISimage.png");
                     File.WriteAllBytes(filePathD, texture.EncodeToPNG());
-                    #endif
+                    #endif*/
                 }
             }
 
             Destroy(processedTexture);
 
             // Update the image index every 5 frames
-            if (frameCount % 5 == 0 && !useCameraCapture)
+            if (frameCount % 10 == 0 && !useCameraCapture)
             {
                 imageIndex = (imageIndex + 1) % images.Length;
                 Debug.Log($"Changing image to: {images[imageIndex].name}");
@@ -296,14 +291,6 @@ public class ImageProcessorClient : MonoBehaviour
         }
     }
 
-    void LogProcessingStats()
-    {
-        if (processingTimes.Count == 0) return;
-        float mean = processingTimes.Average();
-        float stdDev = Mathf.Sqrt(processingTimes.Average(v => Mathf.Pow(v - mean, 2)));
-        Debug.Log($"[Processing Stats] Mean: {mean:F3} sec, Std Dev: {stdDev:F3} sec");
-    }
-
     private Texture2D ConvertToRGB24(Texture2D source)
     {
         if (source.format == TextureFormat.RGB24)
@@ -359,4 +346,18 @@ public class ImageProcessorClient : MonoBehaviour
     {
         SceneManager.LoadScene(sceneName);
     }
+
+    void SaveLogToFile(string logData)
+    {
+        string filePath = Path.Combine(Application.persistentDataPath, "log.txt");
+        
+        // Abre o arquivo e adiciona a nova linha no final
+        using (StreamWriter writer = new StreamWriter(filePath, true))
+        {
+            writer.WriteLine(logData); // Escreve uma nova linha com os dados
+        }
+
+        Debug.Log($"Log salvo em: {filePath}");
+    }
+
 }
