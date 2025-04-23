@@ -31,8 +31,10 @@ public class ImageProcessorClient : MonoBehaviour
     private Texture2D cameraTexture = null;
     public TextMeshPro butaoCamera;
 
-    private List<float> processingTimes = new List<float>();
     int frameCount = 0;
+    private List<string> logBuffer = new List<string>();
+    private int logWriteInterval = 10; // Write to file every 10 log entries
+    private string startTimeBeforeConvert, startTime, endTime;
 
     void Start()
     {
@@ -90,10 +92,8 @@ public class ImageProcessorClient : MonoBehaviour
         {
             frameCount++;
             Debug.Log($"\n===== Starting Frame #{frameCount} =====");
-            string startTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
             
             yield return new WaitForEndOfFrame();
-
 
             Texture2D textureToSend;
             if (useCameraCapture)
@@ -137,7 +137,6 @@ public class ImageProcessorClient : MonoBehaviour
                 imageToSend = textureToSend;
             }
 
-            
             Texture2D rgbTexture = ConvertToRGB24(imageToSend);
             Texture2D processedTexture = ResizeTexture(rgbTexture, 640, 640);
             
@@ -151,11 +150,15 @@ public class ImageProcessorClient : MonoBehaviour
                 displayImage.texture = processedTexture;
             }
 
+            startTimeBeforeConvert = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
+
             byte[] imageBytes = processedTexture.EncodeToPNG();
             string base64Image = Convert.ToBase64String(imageBytes);
             
             WWWForm form = new WWWForm();
             form.AddField("imageData", base64Image);
+
+            startTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
 
             //#if UNITY_EDITOR
             //string filePathA = Path.Combine(Application.persistentDataPath, $"{frameCount}input.txt");
@@ -168,43 +171,45 @@ public class ImageProcessorClient : MonoBehaviour
                 www.downloadHandler = new DownloadHandlerBuffer();
                 yield return www.SendWebRequest();
 
-                string endTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
-
-                Debug.Log($"Frame #{frameCount}; Image {images[imageIndex]}; Start: {startTime}; End: {endTime}");
-                string logEntry = $"{frameCount}; {images[imageIndex]?.name}; {startTime}; {endTime}";
-                Debug.Log(logEntry);
-                #if UNITY_EDITOR
-                SaveLogToFile(logEntry);
-                #endif
-
                 if (www.result != UnityWebRequest.Result.Success)
                 {
                     Debug.LogError($"Error in request: {www.error}");
                 }
                 else
                 {
-                    Debug.Log("Sucess!");
+                    endTime = System.DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss.fff");
+
+                    //Debug.Log($"Frame #{frameCount}; Image {images[imageIndex]}; Start: {startTime}; End: {endTime}");
+
+                    //Debug.Log("Sucess!");
                     //string responseString = System.Text.Encoding.UTF8.GetString(www.downloadHandler.data);
                     string responseString = www.downloadHandler.text;
 
-                    string[] responseParts = responseString.Split(new char[] { ' ' }, 3);
-                    if (responseParts.Length != 3)
+                    string[] responseParts = responseString.Split(new char[] { ' ' }, 6);
+                    if (responseParts.Length != 6)
                     {
-                        Debug.LogError($"Invalid response format. Expected 3 parts, got {responseParts.Length}");
+                        Debug.LogError($"Invalid response format. Expected 6 parts, got {responseParts.Length}");
                         yield break;
                     }
 
                     string imageData = responseParts[0].Trim();
+                    string param1 = responseParts[1].Trim(); // Extract parameter 1
+                    string param2 = responseParts[2].Trim(); // Extract parameter 2
+                    string param3 = responseParts[3].Trim(); // Extract parameter 3
+                    string param4 = responseParts[4].Trim(); // Extract parameter 4
+                    string param5 = responseParts[5].Trim(); // Extract parameter 5
+
+                    //Debug.Log("test:" + param3);
 
                     /*#if UNITY_EDITOR
                     string filePathB = Path.Combine(Application.persistentDataPath, $"{frameCount}_response.txt");
-                    File.WriteAllBytes(filePathB, imageData.Select(c => (byte)c).ToArray());
+                    File.WriteAllBytes(filePathB, responseString.Select(c => (byte)c).ToArray());
                     #endif*/
 
                     Texture2D texture = DecodeBase64ToTexture(imageData,frameCount);
 
                     displayImageRecebida.texture = texture;
-                    Debug.Log("Received image displayed successfully!");
+                    //Debug.Log("Received image displayed successfully!");
 
                     /*#if UNITY_EDITOR
                     //string filePathC = Path.Combine(Application.persistentDataPath, $"{frameCount}_DEPOISimage.txt");
@@ -212,6 +217,13 @@ public class ImageProcessorClient : MonoBehaviour
                     string filePathD = Path.Combine(Application.persistentDataPath, $"{frameCount}_DEPOISimage.png");
                     File.WriteAllBytes(filePathD, texture.EncodeToPNG());
                     #endif*/
+
+                    string logEntry = $"{frameCount}; {images[imageIndex]?.name}; {startTimeBeforeConvert}; {startTime}; {endTime}; {param1}; {param2}; {param3}; {param4}; {param5}";
+                    //Debug.Log(logEntry);
+
+                    #if UNITY_EDITOR
+                    SaveLogToFile(logEntry);
+                    #endif
                 }
             }
 
@@ -230,6 +242,7 @@ public class ImageProcessorClient : MonoBehaviour
     // Limpa os recursos da câmera quando o script é desabilitado ou destruído
     private void OnDisable()
     {
+        FlushLogToFile();
         if (photoCaptureObject != null)
         {
             photoCaptureObject.StopPhotoModeAsync(OnStoppedPhotoMode);
@@ -349,15 +362,45 @@ public class ImageProcessorClient : MonoBehaviour
 
     void SaveLogToFile(string logData)
     {
-        string filePath = Path.Combine(Application.persistentDataPath, "log.txt");
-        
-        // Abre o arquivo e adiciona a nova linha no final
-        using (StreamWriter writer = new StreamWriter(filePath, true))
-        {
-            writer.WriteLine(logData); // Escreve uma nova linha com os dados
-        }
+        logBuffer.Add(logData);
 
-        Debug.Log($"Log salvo em: {filePath}");
+        if (frameCount % logWriteInterval == 0)
+        {
+            FlushLogToFile();
+        }
+    }
+
+    void FlushLogToFile()
+    {
+        if (logBuffer.Count > 0)
+        {
+            string filePath = Path.Combine(Application.persistentDataPath, "logTest.txt");
+
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(filePath, true))
+                {
+                    foreach (string logEntry in logBuffer)
+                    {
+                        writer.WriteLine(logEntry);
+                    }
+                }
+
+                Debug.Log($"Log salvo em: {filePath}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Erro ao salvar o log no arquivo: {e.Message}");
+            }
+
+            logBuffer.Clear();
+        }
+    }
+
+    // Ensure the log is flushed when the application quits
+    private void OnApplicationQuit()
+    {
+        FlushLogToFile();
     }
 
 }
