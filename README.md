@@ -51,7 +51,7 @@ Before building and deploying, confirm that the project is set to UWP (Universal
 
 * This scene processes images to obfuscate sensitive information.
 
-* **Important**: For the obfuscation feature to work, you must be connected to **IPLeiria wi-fi** or by the **IPLeiria VPN**. If is not possible to connect to this VPN or wi-fi, you can use [safeAR](https://github.com/ipleiria-ciic/safe-ar/) server.
+* **Important**: If you are connected to **IPLeiria wi-fi** or by the **IPLeiria VPN**, you can use the SafeAR service running at IPLeiria's server. If is not possible to connect to this VPN or wi-fi, you should configure your own [SafeAR](https://github.com/ipleiria-ciic/safe-ar/) server.
 
 ### 2. Tutorial Scene
 
